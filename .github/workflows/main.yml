@@ -1,33 +1,29 @@
-name: CI/CD Pipeline
+name: Node.js CI to ECR
 
 on:
   push:
-    branches: [ main ] # מופעל בכל פעם שיש Push ל-Main
+    branches: [ develop, main ]
 
 env:
-  AWS_REGION: eu-central-1                 
-  ECR_REPOSITORY: bezeq-nodejs-api        
-  CONFIG_REPO_NAME: bezeq-app-config
+  AWS_REGION: eu-central-1
+  ECR_REPOSITORY: bezeq-nodejs-api
+  CONFIG_REPO_NAME: bezeq-infra-config 
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      - name: Checkout Application Code
         uses: actions/checkout@v3
 
-      
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-      
-      - name: Install and Test
-        run: |
-          npm install
-          npm test
+      # 1. התקנה ובדיקות
+      - name: Install dependencies
+        run: npm install 
 
-      
+      - name: Run Tests
+        run: npm test 
+
+      # 2. התחברות ל-AWS
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -39,8 +35,8 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
-      
-      - name: Build, tag, and push image to Amazon ECR
+      # 3. בנייה ודחיפה של ה-Image [cite: 30]
+      - name: Build and Push Image
         id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -50,22 +46,19 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-      
+      # 4. עדכון ה-Config Repo (החלק של ה-GitOps) 
       - name: Update Config Repo
         env:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           git config --global user.email "devops@bezeq.co.il"
-          git config --global user.name "Bezeq CI Bot"
+          git config --global user.name "CI-Bot"
           
-          # Clone ל-Config Repo (דורש Personal Access Token - PAT)
           git clone https://${{ secrets.GH_PAT }}@github.com/${{ github.repository_owner }}/${{ env.CONFIG_REPO_NAME }}.git
           cd ${{ env.CONFIG_REPO_NAME }}
           
-          # עדכון ה-Tag החדש בתוך קובץ ה-Values של סביבת Dev
-          # משתמשים ב-yq (כלי לעריכת YAML) כדי לשנות את הערך
-          sed -i "s/imageTag:.*/imageTag: \"$IMAGE_TAG\"/" envs/dev/values.yaml
+          sed -i "s/tag:.*/tag: \"$IMAGE_TAG\"/" envs/dev/values.yaml
           
           git add envs/dev/values.yaml
-          git commit -m "Update Dev image to $IMAGE_TAG"
+          git commit -m "Update image tag to $IMAGE_TAG [skip ci]"
           git push
