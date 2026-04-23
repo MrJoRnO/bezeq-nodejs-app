@@ -52,15 +52,24 @@ jobs:
       - name: Update Config Repo
         env:
           IMAGE_TAG: ${{ github.sha }}
+          TARGET_BRANCH: ${{ github.ref_name }}
         run: |
           git config --global user.email "devops@bezeq.co.il"
           git config --global user.name "CI-Bot"
           
-          git clone https://${{ secrets.GH_PAT }}@github.com/${{ github.repository_owner }}/${{ env.CONFIG_REPO_NAME }}.git
+          git clone-b $TARGET_BRANCH https://${{ secrets.GH_PAT }}@github.com/${{ github.repository_owner }}/${{ env.CONFIG_REPO_NAME }}.git
           cd ${{ env.CONFIG_REPO_NAME }}
           
-          sed -i "s/tag:.*/tag: \"$IMAGE_TAG\"/" envs/dev/values.yaml
-          
-          git add envs/dev/values.yaml
-          git commit -m "Update image tag to $IMAGE_TAG [skip ci]"
-          git push
+          ENV_DIR=$TARGET_BRANCH
+        
+          if [ "$TARGET_BRANCH" == "main" ]; then
+            ENV_DIR="prod"
+          elif [ "$TARGET_BRANCH" == "staging" ]; then
+            ENV_DIR="staging"
+          else
+            ENV_DIR="dev"
+          fi
+          sed -i "s/tag:.*/tag: \"$IMAGE_TAG\"/" envs/$ENV_DIR/values.yaml
+          git add envs/$ENV_DIR/values.yaml
+          git commit -m "Update $ENV_DIR image tag to $IMAGE_TAG [skip ci]"
+          git push origin $TARGET_BRANCH
