@@ -6,7 +6,6 @@ on:
 
 env:
   AWS_REGION: eu-central-1
-  ECR_REPOSITORY: bezeq-nodejs-api
   CONFIG_REPO_NAME: bezeq-infra-config 
 
 jobs:
@@ -33,13 +32,16 @@ jobs:
 
       - name: Login to Amazon ECR
         id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          mask-password: 'true'
 
       # 3. בנייה ודחיפה של ה-Image [cite: 30]
       - name: Build and Push Image
         id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ github.ref == 'refs/heads/main' && 'bezeq-app-prod-api' || (github.ref == 'refs/heads/staging' && 'bezeq-app-staging-api' || 'bezeq-app-dev-api') }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
