@@ -69,7 +69,8 @@ jobs:
           else
             ENV_DIR="dev"
           fi
-          sed -i "s/tag:.*/tag: \"$IMAGE_TAG\"/" envs/$ENV_DIR/values.yaml
-          git add envs/$ENV_DIR/values.yaml
+          sed -i "s/tag:.*/tag: \"$IMAGE_TAG\"/" charts/nodejs-api/envs/$ENV_DIR/values.yaml
+          git add charts/nodejs-api/envs/$ENV_DIR/values.yaml
           git commit -m "Update $ENV_DIR image tag to $IMAGE_TAG [skip ci]"
           git push origin $TARGET_BRANCH
+         
